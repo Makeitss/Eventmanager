@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EventManager | Panel</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div id="app"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const API_URL = "http://localhost:3000/api";
+
+/* --------- ÍCONOS SVG --------- */
+const icons = {
+    bell: `<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>`,
+    calendar: `<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+    location: `<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`,
+    users: `<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>`,
+    plus: `<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+    search: `<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>`,
+    tag: `<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`
+};
+
+/* --------- CATEGORÍAS PREDEFINIDAS --------- */
+const CATEGORIES = [
+    "Conferencia",
+    "Taller",
+    "Seminario",
+    "Networking",
+    "Deportivo",
+    "Cultural",
+    "Social",
+    "Educativo",
+    "Tecnología",
+    "Música",
+    "Arte",
+    "Otro"
+];
+
+/* --------- ESTADO --------- */
+const state = {
+    currentUser: JSON.parse(localStorage.getItem("event_user")),
+    events: [],
+    registeredEvents: [],
+    notifications: [],
+    view: "events",
+    showNotifications: false,
+    formData: {},
+    errors: {},
+    map: null,
+    selectedLocation: null,
+    editingEvent: null,
+    searchQuery: "",
+    selectedCategory: "all"
+};
+
+if(!state.currentUser){
+    window.location.href = "auth.html";
+}
+
+/* --------- NOTIFICACIONES --------- */
+async function loadNotifications(){
+    try {
+        const res = await fetch(`${API_URL}/notifications/user/${state.currentUser.id}`);
+        if(res.ok) {
+            state.notifications = await res.json();
+            render();
+        }
+    } catch(e) {
+        console.error("Error loading notifications:", e);
+    }
+}
+
+async function markNotificationAsRead(notificationId){
+    try {
+        await fetch(`${API_URL}/notifications/${notificationId}/read`, {
+            method: "PATCH"
+        });
+        await loadNotifications();
+    } catch(e) {
+        console.error("Error marking notification:", e);
+    }
+}
+
+function toggleNotifications(){
+    state.showNotifications = !state.showNotifications;
+    render();
+}
+
+function getUnreadCount(){
+    return state.notifications.filter(n => !n.read).length;
+}
+
+function formatTimeAgo(date){
+    const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+    
+    if(seconds < 60) return "Hace un momento";
+    if(seconds < 3600) return `Hace ${Math.floor(seconds/60)} minutos`;
+    if(seconds < 86400) return `Hace ${Math.floor(seconds/3600)} horas`;
+    return `Hace ${Math.floor(seconds/86400)} días`;
+}
+
+/* --------- SESIÓN --------- */
+function handleLogout(){
+    localStorage.removeItem("event_user");
+    window.location.href = "auth.html";
+}
+
+/* --------- UTILS --------- */
+function mapServerEvent(row){
+    return {
+        id: row.id,
+        title: row.title,
+        description: row.description,
+        date: row.date,
+        location: row.location,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        capacity: row.capacity,
+        attendees: row.attendees,
+        createdBy: row.created_by,
+        image: row.image || null,
+        category: row.category || "Otro"
+    };
+}
+
+function isRegistered(id){
+    return state.registeredEvents.includes(id);
+}
+
+/* --------- BÚSQUEDA Y FILTROS --------- */
+function handleSearch(e){
+    state.searchQuery = e.target.value.toLowerCase();
+    render();
+}
+
+function handleCategoryFilter(category){
+    state.selectedCategory = category;
+    render();
+}
+
+function getFilteredEvents(){
+    let filtered = [...state.events];
+    
+    // Filtrar por búsqueda
+    if(state.searchQuery){
+        filtered = filtered.filter(e => 
+            e.title.toLowerCase().includes(state.searchQuery) ||
+            e.description.toLowerCase().includes(state.searchQuery) ||
+            e.location.toLowerCase().includes(state.searchQuery)
+        );
+    }
+    
+    // Filtrar por categoría
+    if(state.selectedCategory !== "all"){
+        filtered = filtered.filter(e => e.category === state.selectedCategory);
+    }
+    
+    return filtered;
+}
+
+/* --------- CARGA DE DATOS --------- */
+async function loadRegisteredEvents(){
+    try {
+        const res = await fetch(`${API_URL}/registrations/user/${state.currentUser.id}`);
+        if(res.ok) {
+            state.registeredEvents = await res.json();
+        }
+    } catch(e) {
+        console.error("Error loading registrations:", e);
+    }
+}
+
+async function loadEvents(){
+    try {
+        const res = await fetch(`${API_URL}/events`);
+        if(res.ok) {
+            const rows = await res.json();
+            state.events = rows.map(mapServerEvent);
+            render();
+        }
+    } catch(e) {
+        console.error("Error loading events:", e);
+    }
+}
+
+/* --------- ACCIONES DE EVENTOS --------- */
+async function handleRegisterAttendance(id){
+    try {
+        const res = await fetch(`${API_URL}/events/${id}/register`,{
+            method:"POST",
+            headers:{ "Content-Type":"application/json" },
+            body: JSON.stringify({ userId: state.currentUser.id })
+        });
+        
+        if(res.ok){
+            await loadRegisteredEvents();
+            await loadEvents();
+            await loadNotifications();
+        }
+    } catch(e) {
+        console.error("Error registering:", e);
+    }
+}
+
+async function handleUnregisterAttendance(id){
+    try {
+        const res = await fetch(`${API_URL}/events/${id}/unregister`,{
+            method:"POST",
+            headers:{ "Content-Type":"application/json" },
+            body: JSON.stringify({ userId: state.currentUser.id })
+        });
+        
+        if(res.ok){
+            await loadRegisteredEvents();
+            await loadEvents();
+            await loadNotifications();
+        }
+    } catch(e) {
+        console.error("Error unregistering:", e);
+    }
+}
+
+async function handleDeleteEvent(id){
+    if(confirm("¿Estás seguro de eliminar este evento?")){
+        try {
+            await fetch(`${API_URL}/events/${id}`,{ method:"DELETE" });
+            await loadEvents();
+        } catch(e) {
+            console.error("Error deleting event:", e);
+        }
+    }
+}
+
+/* --------- MODAL Y FORMULARIO --------- */
+function openCreateEventModal(){
+    state.view = "create";
+    state.formData = {};
+    state.selectedLocation = null;
+    state.editingEvent = null;
+    render();
+    setTimeout(initMap, 100);
+}
+
+function openEditEventModal(eventId){
+    const event = state.events.find(e => e.id === eventId);
+    if(!event) return;
+    
+    state.view = "edit";
+    state.editingEvent = event;
+    state.formData = { imageData: event.image };
+    state.selectedLocation = event.latitude && event.longitude ? {
+        lat: event.latitude,
+        lng: event.longitude
+    } : null;
+    render();
+    setTimeout(() => {
+        initMap();
+        if(state.selectedLocation){
+            state.map.setView([state.selectedLocation.lat, state.selectedLocation.lng], 15);
+            state.marker = L.marker([state.selectedLocation.lat, state.selectedLocation.lng]).addTo(state.map);
+        }
+    }, 100);
+}
+
+function closeModal(){
+    state.view = "events";
+    state.formData = {};
+    state.errors = {};
+    state.editingEvent = null;
+    render();
+}
+
+function initMap(){
+    if(state.map){
+        state.map.remove();
+    }
+
+    state.map = L.map('map').setView([4.6097, -74.0817], 12);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(state.map);
+
+    state.map.on('click', function(e){
+        if(state.marker){
+            state.map.removeLayer(state.marker);
+        }
+        
+        state.marker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(state.map);
+        state.selectedLocation = {
+            lat: e.latlng.lat,
+            lng: e.latlng.lng
+        };
+        
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${e.latlng.lat}&lon=${e.latlng.lng}&format=json`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('location').value = data.display_name;
+            });
+    });
+}
+
+function handleImageUpload(e){
+    const file = e.target.files[0];
+    if(file){
+        // Validar tamaño (máximo 5MB)
+        if(file.size > 5 * 1024 * 1024){
+            alert("La imagen es muy grande. Máximo 5MB");
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(event){
+            state.formData.imageData = event.target.result;
+            const preview = document.getElementById('imagePreview');
+            if(preview){
+                preview.src = event.target.result;
+                preview.classList.add('active');
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function removeImage(){
+    state.formData.imageData = null;
+    const fileInput = document.querySelector('input[type="file"]');
+    if(fileInput) fileInput.value = '';
+    render();
+    setTimeout(() => {
+        if(state.map) {
+            state.map.invalidateSize();
+        }
+    }, 100);
+}
+
+async function handleCreateEvent(e){
+    e.preventDefault();
+    
+    state.errors = {};
+    
+    const form = e.target;
+    const formData = new FormData(form);
+    
+    const eventData = {
+        title: formData.get('title'),
+        description: formData.get('description'),
+        date: formData.get('date'),
+        location: formData.get('location'),
+        latitude: state.selectedLocation?.lat || null,
+        longitude: state.selectedLocation?.lng || null,
+        capacity: parseInt(formData.get('capacity')),
+        category: formData.get('category'), // CORREGIDO: Ahora captura correctamente la categoría
+        createdBy: state.currentUser.id,
+        image: state.formData.imageData || null
+    };
+    
+    console.log('Datos del evento a enviar:', eventData); // Para debugging
+    
+    if(!eventData.title || !eventData.date || !eventData.capacity){
+        state.errors.general = "Por favor completa todos los campos requeridos";
+        render();
+        return;
+    }
+    
+    try {
+        let res;
+        if(state.view === "edit" && state.editingEvent){
+            // Actualizar evento existente
+            res = await fetch(`${API_URL}/events/${state.editingEvent.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(eventData)
+            });
+        } else {
+            // Crear nuevo evento
+            res = await fetch(`${API_URL}/events`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(eventData)
+            });
+        }
+        
+        if(res.ok){
+            closeModal();
+            await loadEvents();
+        } else {
+            const error = await res.json();
+            state.errors.general = error.message || "Error al guardar el evento";
+            render();
+        }
+    } catch(e) {
+        console.error("Error:", e);
+        state.errors.general = state.view === "edit" ? "Error al actualizar el evento" : "Error al crear el evento";
+        render();
+    }
+}
+
+/* --------- RENDER --------- */
+function render(){
+    const unreadCount = getUnreadCount();
+    const filteredEvents = getFilteredEvents();
+    
+    app.innerHTML = `
+        <div class="header">
+            <div>
+                <h1>EventManager</h1>
+            </div>
+            <div class="user-section">
+                <div class="notification-icon" onclick="toggleNotifications()">
+                    ${icons.bell}
+                    ${unreadCount > 0 ? `<span class="notification-badge">${unreadCount}</span>` : ''}
+                </div>
+                <span class="user-name">${state.currentUser.name}</span>
+                <button class="btn btn-danger" onclick="handleLogout()">Cerrar sesión</button>
+            </div>
+        </div>
+
+        <div class="notification-panel ${state.showNotifications ? 'active' : ''}">
+            <div class="notification-header">
+                <h3>Notificaciones</h3>
+                <button class="close-btn" onclick="toggleNotifications()">×</button>
+            </div>
+            ${state.notifications.length === 0 ? 
+                '<div class="empty-notifications">No tienes notificaciones</div>' :
+                state.notifications.map(n => `
+                    <div class="notification-item ${!n.read ? 'unread' : ''}" 
+                         onclick="markNotificationAsRead(${n.id})">
+                        <div class="notification-message">${n.message}</div>
+                        <div class="notification-time">${formatTimeAgo(n.created_at)}</div>
+                    </div>
+                `).join('')
+            }
+        </div>
+
+        <div class="content-wrapper">
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="openCreateEventModal()">
+                    Crear nuevo evento
+                </button>
+            </div>
+
+            <div class="search-filter-section">
+                <div class="search-box">
+                    ${icons.search}
+                    <input type="text" placeholder="Buscar eventos..." oninput="handleSearch(event)" value="${state.searchQuery}">
+                </div>
+                
+                <div class="category-filters">
+                    <button class="category-chip ${state.selectedCategory === 'all' ? 'active' : ''}" onclick="handleCategoryFilter('all')">
+                        Todos
+                    </button>
+                    ${CATEGORIES.map(cat => `
+                        <button class="category-chip ${state.selectedCategory === cat ? 'active' : ''}" onclick="handleCategoryFilter('${cat}')">
+                            ${cat}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+
+            ${filteredEvents.length === 0 ? `
+                <div class="empty-state">
+                    <p>No se encontraron eventos</p>
+                </div>
+            ` : `
+                <div class="events-grid">
+                    ${filteredEvents.map(e => {
+                        const reg = isRegistered(e.id);
+                        const capacityPercent = (e.attendees / e.capacity) * 100;
+                        
+                        return `
+                            <div class="event-card">
+                                ${e.image ? 
+                                    `<img src="${e.image}" class="event-image" alt="${e.title}" onerror="this.style.display='none'">` :
+                                    `<div class="event-image"></div>`
+                                }
+                                <div class="event-content">
+                                    <div class="event-category-badge">${e.category}</div>
+                                    <h3>${e.title}</h3>
+                                    <p class="event-description">${e.description || 'Sin descripción'}</p>
+                                    
+                                    <div class="event-meta">
+                                        <div class="meta-item">
+                                            ${icons.calendar}
+                                            <span>${new Date(e.date).toLocaleDateString('es', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            })}</span>
+                                        </div>
+                                        <div class="meta-item">
+                                            ${icons.location}
+                                            <span>${e.location || 'Sin ubicación'}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="capacity-indicator">
+                                        <div class="capacity-bar">
+                                            <div class="capacity-fill" style="width: ${capacityPercent}%"></div>
+                                        </div>
+                                        <span class="capacity-text">${e.attendees} / ${e.capacity}</span>
+                                    </div>
+
+                                    <div class="event-actions">
+                                        ${reg
+                                            ? `<button class="btn btn-secondary" onclick="handleUnregisterAttendance(${e.id})">Cancelar inscripción</button>`
+                                            : e.attendees >= e.capacity
+                                                ? `<button class="btn btn-secondary" disabled>Cupo completo</button>`
+                                                : `<button class="btn btn-success" onclick="handleRegisterAttendance(${e.id})">Inscribirse</button>`
+                                        }
+
+                                        ${e.createdBy == state.currentUser.id
+                                            ? `
+                                                <button class="btn btn-secondary" onclick="openEditEventModal(${e.id})">Editar</button>
+                                                <button class="btn btn-danger" onclick="handleDeleteEvent(${e.id})">Eliminar</button>
+                                            `
+                                            : ''
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `}
+        </div>
+
+        ${state.view === 'create' || state.view === 'edit' ? `
+            <div class="modal active">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>${state.view === 'edit' ? 'Editar evento' : 'Crear nuevo evento'}</h2>
+                        <button class="close-btn" onclick="closeModal()">×</button>
+                    </div>
+                    
+                    <form onsubmit="handleCreateEvent(event)">
+                        <div class="form-group">
+                            <label>Título del evento *</label>
+                            <input type="text" name="title" value="${state.editingEvent?.title || ''}" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Descripción</label>
+                            <textarea name="description" placeholder="Describe los detalles del evento">${state.editingEvent?.description || ''}</textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Categoría *</label>
+                            <select name="category" required>
+                                ${CATEGORIES.map(cat => `
+                                    <option value="${cat}" ${state.editingEvent?.category === cat ? 'selected' : ''}>
+                                        ${cat}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Fecha y hora *</label>
+                            <input type="datetime-local" name="date" value="${state.editingEvent ? new Date(state.editingEvent.date).toISOString().slice(0, 16) : ''}" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Capacidad máxima *</label>
+                            <input type="number" name="capacity" min="1" value="${state.editingEvent?.capacity || ''}" placeholder="Número de asistentes" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Imagen del evento (máximo 5MB)</label>
+                            <input type="file" accept="image/*" onchange="handleImageUpload(event)">
+                            ${state.formData.imageData ? `
+                                <img src="${state.formData.imageData}" id="imagePreview" class="image-preview active">
+                                <button type="button" class="btn btn-secondary" style="margin-top: 8px;" onclick="removeImage()">Eliminar imagen</button>
+                            ` : '<img id="imagePreview" class="image-preview">'}
+                        </div>
+
+                        <div class="form-group">
+                            <label>Ubicación</label>
+                            <input type="text" id="location" name="location" value="${state.editingEvent?.location || ''}" placeholder="Haz clic en el mapa para seleccionar" readonly>
+                            <div id="map"></div>
+                        </div>
+
+                        ${state.errors.general ? `<p class="error-message">${state.errors.general}</p>` : ''}
+
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">${state.view === 'edit' ? 'Actualizar evento' : 'Crear evento'}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        ` : ''}
+    `;
+}
+
+/* --------- POLLING DE NOTIFICACIONES --------- */
+setInterval(() => {
+    if(state.view === "events"){
+        loadNotifications();
+    }
+}, 30000);
+
+/* --------- INIT --------- */
+(async function init(){
+    await loadRegisteredEvents();
+    await loadEvents();
+    await loadNotifications();
+})();
+</script>
+
+</body>
+</html>
