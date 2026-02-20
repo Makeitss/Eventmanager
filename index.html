@@ -1,209 +1,886 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>EventManager | Acceso</title>
-<style>
-    *{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGCI Pro | MVP Corregido</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-body{
-    background:#f5f5f5;
-    min-height:100vh;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-}
+    <!-- Librería Escáner -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
-/* CONTENEDOR */
-.auth-container{
-    background:#ffffff;
-    width:100%;
-    max-width:420px;
-    border-radius:12px;
-    box-shadow:0 8px 30px rgba(0,0,0,0.08);
-    padding:32px;
-}
+    <!-- Configuración Tailwind (Monocromo + Íconos) -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gray: {
+                            50: '#f9fafb',
+                            100: '#f3f4f6',
+                            200: '#e5e7eb',
+                            300: '#d1d5db',
+                            400: '#9ca3af',
+                            500: '#6b7280',
+                            600: '#4b5563',
+                            700: '#374151',
+                            800: '#1f2937',
+                            900: '#111827',
+                            950: '#030712',
+                        }
+                    },
+                    zIndex: {
+                        '60': '60', // Capa para el Escáner (Debe ser superior)
+                        '50': '50', // Capa para Modales estándar
+                    }
+                }
+            }
+        }
+    </script>
 
-/* TÍTULO */
-.header h1{
-    font-size:26px;
-    font-weight:600;
-    color:#111;
-    margin-bottom:24px;
-    text-align:center;
-}
-
-/* INPUTS */
-input{
-    width:100%;
-    padding:12px 14px;
-    border-radius:8px;
-    border:1px solid #ddd;
-    font-size:14px;
-    margin-bottom:14px;
-    outline:none;
-    transition:border 0.2s;
-}
-
-input:focus{
-    border-color:#000;
-}
-
-/* BOTÓN PRINCIPAL */
-button{
-    width:100%;
-    padding:12px;
-    background:#000;
-    color:#fff;
-    border:none;
-    border-radius:8px;
-    font-size:14px;
-    font-weight:500;
-    cursor:pointer;
-    transition:background 0.3s;
-}
-
-button:hover{
-    color: rgba(167, 167, 167, 0.61);
-}
-
-/* TEXTO INFERIOR */
-p{
-    margin-top:16px;
-    font-size:14px;
-    text-align:center;
-    color:#555;
-}
-
-/* BOTÓN LINK */
-.link-button{
-    background:none;
-    border:none;
-    color:#000;
-    font-weight:500;
-    cursor:pointer;
-    padding:0;
-    margin-left:4px;
-}
-
-/* ERRORES */
-.error-banner{
-    background:#ffffff;
-    color:#b00020;
-    padding:10px;
-    border-radius:8px;
-    font-size:13px;
-    margin-top:14px;
-    text-align:center;
-}
-
-</style>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #111827; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        #reader { width: 100%; border-radius: 0.5rem; overflow: hidden; }
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
 </head>
-<body>
+<body class="h-screen overflow-hidden flex flex-col">
 
-<div class="terminal-window auth-container">
-    <div class="terminal-content">
+    <!-- TOAST NOTIFICATIONS -->
+    <div id="toast-container" class="fixed top-5 right-5 z-[70] flex flex-col gap-2"></div>
 
-        <div class="header">
-            <h1>EventManager</h1>
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md fade-in">
+            <div class="text-center mb-6">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+                    <i class="fa-solid fa-cube text-3xl text-gray-800"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-900">SGCI Pro</h1>
+                <p class="text-gray-500">Sistema de Gestión Comercial</p>
+            </div>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><i class="fa-solid fa-user"></i></span>
+                        <input type="text" id="username" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 outline-none transition bg-gray-50" placeholder="admin" required>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><i class="fa-solid fa-lock"></i></span>
+                        <input type="password" id="password" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 outline-none transition bg-gray-50" placeholder="••••" required>
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-gray-900 hover:bg-gray-800 text-white font-bold py-2.5 rounded-lg shadow-md transition transform active:scale-95">
+                    Ingresar al Sistema
+                </button>
+            </form>
+            <div class="mt-6 text-center text-xs text-gray-400">
+                <p>Demo: <strong>admin / 1234</strong></p>
+            </div>
         </div>
-
-        <!-- LOGIN -->
-        <div id="login-view">
-            <input id="username" placeholder="Usuario">
-            <input id="password" type="password" placeholder="Contraseña">
-            <button onclick="handleLogin()">ENTRAR</button>
-
-            <p>
-                ¿No tienes cuenta?
-                <button class="link-button" onclick="showRegister()">Crear una</button>
-            </p>
-        </div>
-
-        <!-- REGISTRO -->
-        <div id="register-view" style="display:none">
-            <input id="name" placeholder="Nombre completo">
-            <input id="username-r" placeholder="Usuario">
-            <input id="password-r" type="password" placeholder="Contraseña">
-            <button onclick="handleRegister()">CREAR CUENTA</button>
-
-            <p>
-                ¿Ya tienes cuenta?
-                <button class="link-button" onclick="showLogin()">Iniciar sesión</button>
-            </p>
-        </div>
-
-        <div id="error" class="error-banner"></div>
-
     </div>
-</div>
 
-<script>
-const API_URL = "http://localhost:3000/api";
+    <!-- APP LAYOUT -->
+    <div id="app-layout" class="flex h-full hidden">
+        
+        <!-- SIDEBAR -->
+        <aside class="w-64 bg-gray-950 text-white flex flex-col transition-all duration-300 hidden md:flex" id="sidebar">
+            <div class="h-16 flex items-center px-6 border-b border-gray-800">
+                <i class="fa-solid fa-cube text-white text-xl mr-3"></i>
+                <span class="font-bold text-lg tracking-wide text-white">SGCI Pro</span>
+            </div>
+            
+            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1" id="nav-menu"></nav>
 
-/* --------- VISTAS --------- */
-function showRegister(){
-    document.getElementById("login-view").style.display = "none";
-    document.getElementById("register-view").style.display = "block";
-}
+            <div class="p-4 border-t border-gray-800 bg-gray-950">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center font-bold text-lg text-white" id="user-avatar">A</div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-white truncate" id="user-name">Usuario</p>
+                        <p class="text-xs text-gray-500 truncate" id="user-role">Rol</p>
+                    </div>
+                    <button id="logout-btn" class="text-gray-500 hover:text-white transition">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
 
-function showLogin(){
-    document.getElementById("register-view").style.display = "none";
-    document.getElementById("login-view").style.display = "block";
-}
+        <!-- MAIN CONTENT -->
+        <main class="flex-1 flex flex-col h-full overflow-hidden bg-gray-50">
+            <!-- Header -->
+            <header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 md:px-8 shadow-sm z-10">
+                <div class="flex items-center gap-4">
+                    <button class="md:hidden text-gray-600 hover:text-gray-900" onclick="toggleSidebar()">
+                        <i class="fa-solid fa-bars text-xl"></i>
+                    </button>
+                    <h2 id="page-title" class="text-xl font-bold text-gray-900">Dashboard</h2>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="text-sm text-gray-500 hidden sm:block" id="current-date"></span>
+                    <button class="relative p-2 text-gray-400 hover:text-gray-900 transition">
+                        <i class="fa-solid fa-bell"></i>
+                        <span class="absolute top-1 right-1 w-2 h-2 bg-black rounded-full"></span>
+                    </button>
+                </div>
+            </header>
 
-/* --------- LOGIN --------- */
-async function handleLogin(){
-    try{
-        const username = document.getElementById("username").value;
-        const password = document.getElementById("password").value;
+            <!-- Dynamic View Container -->
+            <div id="content-area" class="flex-1 overflow-auto p-4 md:p-8 relative">
+                
+                <!-- VIEW: DASHBOARD -->
+                <section id="view-dashboard" class="view-section fade-in max-w-7xl mx-auto">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Capital Neto</p>
+                                    <h3 class="text-2xl font-bold text-gray-900 mt-1" id="dash-capital">$0.00</h3>
+                                </div>
+                                <div class="p-2 bg-gray-100 rounded-lg"><i class="fa-solid fa-wallet text-gray-600"></i></div>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Ventas (Mes)</p>
+                                    <h3 class="text-2xl font-bold text-gray-900 mt-1" id="dash-sales">$0.00</h3>
+                                </div>
+                                <div class="p-2 bg-gray-100 rounded-lg"><i class="fa-solid fa-chart-line text-gray-600"></i></div>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Utilidad</p>
+                                    <h3 class="text-2xl font-bold text-gray-900 mt-1" id="dash-profit">$0.00</h3>
+                                </div>
+                                <div class="p-2 bg-gray-100 rounded-lg"><i class="fa-solid fa-sack-dollar text-gray-600"></i></div>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Stock</p>
+                                    <h3 class="text-2xl font-bold text-gray-900 mt-1" id="dash-stock">0</h3>
+                                </div>
+                                <div class="p-2 bg-gray-100 rounded-lg"><i class="fa-solid fa-box-open text-gray-600"></i></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                            <h3 class="font-bold text-gray-800">Movimientos Recientes</h3>
+                            <button onclick="loadDashboard()" class="text-sm text-gray-600 hover:text-black hover:underline"><i class="fa-solid fa-rotate-right"></i> Actualizar</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm text-gray-600">
+                                <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-500">
+                                    <tr><th class="px-6 py-3">Fecha</th><th class="px-6 py-3">Tipo</th><th class="px-6 py-3">Descripción</th><th class="px-6 py-3 text-right">Monto</th><th class="px-6 py-3">Usuario</th></tr>
+                                </thead>
+                                <tbody id="dash-table-body" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
 
-        const res = await fetch(`${API_URL}/auth/login`,{
-            method:"POST",
-            headers:{ "Content-Type":"application/json" },
-            body: JSON.stringify({ username, password })
+                <!-- VIEW: POS (Con Escáner Integrado) -->
+                <section id="view-pos" class="view-section hidden fade-in h-full flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto">
+                    <div class="flex-1 flex flex-col h-full overflow-hidden">
+                        <div class="flex gap-2 mb-4">
+                            <div class="relative flex-1">
+                                <i class="fa-solid fa-search absolute left-3 top-3 text-gray-400"></i>
+                                <input type="text" id="pos-search" placeholder="Buscar producto o IMEI..." class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none shadow-sm bg-white">
+                            </div>
+                            <!-- BOTÓN ESCÁNER EN POS -->
+                            <button onclick="startScanner('pos')" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2.5 rounded-lg shadow-sm transition flex items-center gap-2 border border-gray-300" title="Escanear código de barras para vender">
+                                <i class="fa-solid fa-camera text-blue-500"></i> <span class="hidden sm:inline font-medium">Escanear Venta</span>
+                            </button>
+                        </div>
+
+                        <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4" id="pos-grid"></div>
+                    </div>
+
+                    <!-- Cart Sidebar -->
+                    <div class="w-full lg:w-96 bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col h-[calc(100vh-8rem)] lg:h-auto sticky top-0">
+                        <div class="p-4 border-b border-gray-100 bg-gray-50 rounded-t-xl">
+                            <h3 class="font-bold text-gray-900 flex items-center gap-2"><i class="fa-solid fa-cart-shopping text-gray-600"></i> Carrito</h3>
+                        </div>
+                        <div class="flex-1 overflow-y-auto p-4 space-y-3" id="cart-container"></div>
+
+                        <div class="p-5 border-t border-gray-200 bg-gray-50 rounded-b-xl space-y-3">
+                            <div class="flex justify-between text-sm text-gray-600">
+                                <span>Subtotal:</span>
+                                <span id="cart-subtotal" class="font-medium">$0.00</span>
+                            </div>
+                            <div class="flex justify-between text-xl font-bold text-gray-900 pt-2 border-t border-gray-200">
+                                <span>Total:</span>
+                                <span id="cart-total">$0.00</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <select id="payment-method" class="col-span-2 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-gray-500 outline-none bg-white">
+                                    <option value="efectivo">Efectivo</option>
+                                    <option value="tarjeta">Tarjeta</option>
+                                    <option value="transferencia">Transferencia</option>
+                                </select>
+                                <button onclick="clearCart()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 text-sm font-medium transition">Limpiar</button>
+                                <button onclick="processSale()" class="col-span-1 bg-gray-900 hover:bg-black text-white rounded-lg shadow-md transition font-bold py-2 flex items-center justify-center gap-2">
+                                    Vender
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VIEW: INVENTORY -->
+                <section id="view-inventory" class="view-section hidden fade-in max-w-7xl mx-auto">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <div class="relative w-full md:w-96">
+                            <i class="fa-solid fa-search absolute left-3 top-3 text-gray-400"></i>
+                            <input type="text" id="inv-search" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 outline-none bg-white" placeholder="Buscar por nombre, IMEI...">
+                        </div>
+                        <div id="inv-actions" class="flex gap-2 w-full md:w-auto"></div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm text-gray-600">
+                                <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-500">
+                                    <tr><th class="px-6 py-3">Código/IMEI</th><th class="px-6 py-3">Producto</th><th class="px-6 py-3">Costo</th><th class="px-6 py-3">Precio Base</th><th class="px-6 py-3">Estado</th><th class="px-6 py-3">Ubicación</th><th class="px-6 py-3 text-right">Acciones</th></tr>
+                                </thead>
+                                <tbody id="inv-table-body" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- VIEW: FINANCE -->
+                <section id="view-finance" class="view-section hidden fade-in max-w-7xl mx-auto">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                        <i class="fa-solid fa-file-invoice-dollar text-gray-700"></i> Gestión Financiera
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-green-500">
+                            <p class="text-xs font-semibold text-gray-500 uppercase">Ingresos Totales</p>
+                            <h3 class="text-2xl font-bold text-green-600 mt-1" id="fin-income">$0.00</h3>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-red-500">
+                            <p class="text-xs font-semibold text-gray-500 uppercase">Egresos Totales</p>
+                            <h3 class="text-2xl font-bold text-red-600 mt-1" id="fin-expense">$0.00</h3>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-gray-900">
+                            <p class="text-xs font-semibold text-gray-500 uppercase">Balance Actual</p>
+                            <h3 class="text-2xl font-bold text-gray-900 mt-1" id="fin-balance">$0.00</h3>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                            <h3 class="font-bold text-gray-800">Historial de Movimientos</h3>
+                            <button onclick="toggleModal('trans-modal', true)" class="text-sm bg-gray-900 text-white px-3 py-1.5 rounded hover:bg-black transition">
+                                <i class="fa-solid fa-plus mr-1"></i> Nuevo Movimiento
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm text-gray-600">
+                                <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-500">
+                                    <tr><th class="px-6 py-3">Fecha</th><th class="px-6 py-3">Tipo</th><th class="px-6 py-3">Categoría</th><th class="px-6 py-3">Descripción</th><th class="px-6 py-3 text-right">Monto</th></tr>
+                                </thead>
+                                <tbody id="fin-table-body" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL: ESCÁNER (Z-INDEX 60 - SUPERIOR) -->
+    <div id="scanner-modal" class="fixed inset-0 bg-black/90 z-[60] hidden flex flex-col items-center justify-center p-4">
+        <div class="bg-white rounded-xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div class="flex justify-between items-center p-4 border-b border-gray-200">
+                <h3 class="font-bold text-lg text-gray-900"><i class="fa-solid fa-qrcode mr-2 text-gray-600"></i>Escaneando Código</h3>
+                <button onclick="stopScanner()" class="text-gray-400 hover:text-red-500"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+            <div class="p-4 bg-black">
+                <div id="reader"></div>
+            </div>
+            <div class="p-4 bg-gray-50 flex flex-col gap-2">
+                <p class="text-sm text-gray-500 text-center" id="scan-instruction">Apunta la cámara al código</p>
+                <button onclick="simulateScan()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 rounded font-medium text-sm transition">
+                    <i class="fa-solid fa-keyboard mr-1"></i> Simular Escaneo (Prueba)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: NUEVO PRODUCTO (Z-INDEX 50) -->
+    <div id="product-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all scale-100">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-900">Registrar Dispositivo</h3>
+                <button onclick="toggleModal('product-modal', false)" class="text-gray-400 hover:text-gray-900"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+            <form id="product-form" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Producto</label>
+                    <input type="text" name="name" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-gray-500 outline-none bg-white" required>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Costo</label>
+                        <input type="number" step="0.01" name="cost" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-gray-500 outline-none bg-white" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Precio Base</label>
+                        <input type="number" step="0.01" name="price" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-gray-500 outline-none bg-white" required>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="col-span-2 relative">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">IMEI / Código</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="product-code-input" name="code" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-gray-500 outline-none bg-white" placeholder="Escanear o escribir" required>
+                            <button type="button" onclick="startScanner('inventory')" class="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg border border-gray-300 transition" title="Escanear con Cámara">
+                                <i class="fa-solid fa-camera"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Ubicación</label>
+                    <select name="location" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-gray-500 outline-none bg-white">
+                        <option value="tienda">Tienda</option>
+                        <option value="bodega">Bodega</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" onclick="toggleModal('product-modal', false)" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-gray-900 hover:bg-black text-white rounded-lg shadow-md transition">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: NUEVA TRANSACCIÓN (Z-INDEX 50) -->
+    <div id="trans-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all scale-100">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-900">Registrar Movimiento</h3>
+                <button onclick="toggleModal('trans-modal', false)" class="text-gray-400 hover:text-gray-900"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+            <form id="trans-form" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                    <select name="type" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-gray-500 outline-none bg-white">
+                        <option value="income">Ingreso</option>
+                        <option value="expense">Egreso</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+                    <input type="text" name="category" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-gray-500 outline-none bg-white" placeholder="Ej: Nómina, Servicios" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Monto</label>
+                    <input type="number" step="0.01" name="amount" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-gray-500 outline-none bg-white" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                    <textarea name="desc" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-gray-500 outline-none bg-white" rows="2" required></textarea>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" onclick="toggleModal('trans-modal', false)" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-gray-900 hover:bg-black text-white rounded-lg shadow-md transition">Registrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // --- CONFIG & STATE ---
+        const DB = {
+            USERS: 'sgci_users', PRODUCTS: 'sgci_products',
+            TRANSACTIONS: 'sgci_transactions', SALES: 'sgci_sales', SETTINGS: 'sgci_settings'
+        };
+
+        let currentUser = null;
+        let cart = [];
+        let html5QrcodeScanner = null;
+        let scanContext = 'inventory'; // 'inventory' o 'pos'
+
+        const ROLES = { ADMIN: 'admin', MANAGER: 'gerente', SELLER: 'vendedor', INVESTOR: 'inversionista' };
+        const PERMISSIONS = {
+            [ROLES.ADMIN]: ['dashboard', 'inventory', 'pos', 'finance'],
+            [ROLES.MANAGER]: ['dashboard', 'inventory', 'pos', 'finance'],
+            [ROLES.SELLER]: ['pos', 'inventory_view'],
+            [ROLES.INVESTOR]: ['dashboard', 'finance']
+        };
+
+        // --- UTILS ---
+        const $ = (id) => document.getElementById(id);
+        const formatMoney = (num) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(num);
+        const generateId = () => Math.random().toString(36).substr(2, 9);
+        
+        function showToast(msg, type = 'success') {
+            const container = $('toast-container');
+            const toast = document.createElement('div');
+            const colors = type === 'success' ? 'bg-gray-800' : 'bg-gray-900';
+            const icon = type === 'success' ? '<i class="fa-solid fa-check-circle text-green-400"></i>' : '<i class="fa-solid fa-exclamation-circle text-red-500"></i>';
+            toast.className = `${colors} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] animate-bounce-in transform transition-all`;
+            toast.innerHTML = `${icon} <span class="font-medium text-sm">${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        // --- DATA SEEDING ---
+        function initDB() {
+            if (!localStorage.getItem(DB.USERS)) {
+                const users = [
+                    { id: 1, user: 'admin', pass: '1234', role: ROLES.ADMIN, name: 'Admin General' },
+                    { id: 2, user: 'vendedor', pass: '1234', role: ROLES.SELLER, name: 'Vendedor Tienda' }
+                ];
+                localStorage.setItem(DB.USERS, JSON.stringify(users));
+                const products = [
+                    { id: 'p1', name: 'iPhone 13 128GB', cost: 4500000, price: 5800000, code: '353012345678901', status: 'disponible', location: 'tienda' },
+                    { id: 'p2', name: 'Samsung A54', cost: 1800000, price: 2400000, code: 'R58T12345678', status: 'disponible', location: 'tienda' },
+                    { id: 'p3', name: 'Carga 20W', cost: 15000, price: 35000, code: 'CARG-001', status: 'disponible', location: 'bodega' }
+                ];
+                localStorage.setItem(DB.PRODUCTS, JSON.stringify(products));
+                localStorage.setItem(DB.SETTINGS, JSON.stringify({ initialCapital: 5000000 }));
+                const initialTrans = [
+                    { id: 't1', date: new Date().toISOString(), type: 'income', category: 'Aporte Socios', amount: 5000000, desc: 'Capital Inicial', userId: 1 },
+                    { id: 't2', date: new Date().toISOString(), type: 'expense', category: 'Arriendo', amount: 1200000, desc: 'Pago local mes actual', userId: 1 }
+                ];
+                localStorage.setItem(DB.TRANSACTIONS, JSON.stringify(initialTrans));
+                localStorage.setItem(DB.SALES, '[]');
+            }
+        }
+
+        // --- AUTH ---
+        $('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const users = JSON.parse(localStorage.getItem(DB.USERS));
+            const user = users.find(x => x.user === $('username').value && x.pass === $('password').value);
+            if (user) {
+                currentUser = user;
+                $('login-screen').classList.add('hidden');
+                $('app-layout').classList.remove('hidden');
+                $('app-layout').classList.add('flex');
+                setupDashboard();
+                showToast(`Bienvenido, ${user.name}`);
+            } else {
+                showToast('Credenciales incorrectas', 'error');
+            }
         });
 
-        const data = await res.json();
-        if(!res.ok) throw new Error(data.message);
+        $('logout-btn').addEventListener('click', () => location.reload());
 
-        localStorage.setItem("event_user", JSON.stringify(data.user));
-        window.location.href = "dashboard.html";
+        // --- NAVIGATION ---
+        function setupDashboard() {
+            $('user-name').innerText = currentUser.name;
+            $('user-role').innerText = currentUser.role.toUpperCase();
+            $('user-avatar').innerText = currentUser.name.charAt(0);
+            $('current-date').innerText = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-    }catch(err){
-        document.getElementById("error").innerText = err.message;
-    }
-}
+            const nav = $('nav-menu');
+            nav.innerHTML = '';
+            const perms = PERMISSIONS[currentUser.role] || [];
 
-/* --------- REGISTRO --------- */
-async function handleRegister(){
-    try{
-        const name = document.getElementById("name").value;
-        const username = document.getElementById("username-r").value;
-        const password = document.getElementById("password-r").value;
+            const createLink = (label, id, icon, colorClass) => {
+                const a = document.createElement('a');
+                a.className = 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition cursor-pointer group';
+                a.innerHTML = `<i class="fa-solid ${icon} w-5 text-center ${colorClass} group-hover:opacity-80 transition"></i> <span class="font-medium text-sm">${label}</span>`;
+                a.onclick = () => navigate(id);
+                nav.appendChild(a);
+            };
 
-        const res = await fetch(`${API_URL}/auth/register`,{
-            method:"POST",
-            headers:{ "Content-Type":"application/json" },
-            body: JSON.stringify({ name, username, password })
+            if (perms.includes('dashboard')) createLink('Dashboard', 'dashboard', 'fa-chart-pie', 'text-blue-500');
+            if (perms.includes('pos')) createLink('Punto de Venta', 'pos', 'fa-cash-register', 'text-green-500');
+            if (perms.includes('inventory') || perms.includes('inventory_view')) createLink('Inventario', 'inventory', 'fa-boxes-stacked', 'text-yellow-500');
+            if (perms.includes('finance')) createLink('Finanzas', 'finance', 'fa-file-invoice-dollar', 'text-purple-500');
+
+            navigate('dashboard');
+        }
+
+        function navigate(viewId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            const target = $(`view-${viewId}`);
+            if (target) {
+                target.classList.remove('hidden');
+                $('page-title').innerText = viewId.charAt(0).toUpperCase() + viewId.slice(1);
+                if (viewId === 'dashboard') loadDashboard();
+                if (viewId === 'inventory') loadInventory();
+                if (viewId === 'pos') loadPOS();
+                if (viewId === 'finance') loadFinance();
+            }
+            if (window.innerWidth < 768) $('sidebar').classList.add('hidden');
+        }
+
+        function toggleSidebar() {
+            const sb = $('sidebar');
+            sb.classList.toggle('hidden');
+            sb.classList.toggle('absolute');
+            sb.classList.toggle('z-40');
+            sb.classList.toggle('h-full');
+        }
+
+        // --- SCANNER LOGIC (CORREGIDO Y MEJORADO) ---
+        function startScanner(context) {
+            scanContext = context;
+            $('scanner-modal').classList.remove('hidden');
+            
+            // Texto dinámico según el contexto
+            if (context === 'pos') {
+                $('scan-instruction').innerText = "Escanea el código del producto para agregarlo a la venta";
+            } else {
+                $('scan-instruction').innerText = "Apunta la cámara al código de barras o IMEI";
+            }
+
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            
+            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
+            .catch(err => {
+                console.error(err);
+                showToast("Error iniciando cámara (Requiere HTTPS)", "error");
+            });
+        }
+
+        function stopScanner() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => {
+                    html5QrcodeScanner.clear();
+                    $('scanner-modal').classList.add('hidden');
+                }).catch(err => console.error(err));
+            } else {
+                $('scanner-modal').classList.add('hidden');
+            }
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            if (scanContext === 'inventory') {
+                // Lógica Inventario: Llenar input
+                const input = $('product-code-input');
+                if (input) {
+                    input.value = decodedText;
+                    showToast(`Código capturado: ${decodedText}`);
+                    stopScanner();
+                }
+            } else if (scanContext === 'pos') {
+                // Lógica POS: Buscar y Agregar al Carrito
+                const products = JSON.parse(localStorage.getItem(DB.PRODUCTS));
+                const product = products.find(p => p.code === decodedText && p.status === 'disponible');
+                
+                if (product) {
+                    addToCart(product.id);
+                    showToast(`Producto agregado: ${product.name}`);
+                    stopScanner();
+                } else {
+                    // Si no lo encuentra, buscamos si ya está vendido o no existe
+                    const exists = products.find(p => p.code === decodedText);
+                    if (exists) {
+                        showToast('Producto ya vendido o no disponible', 'error');
+                    } else {
+                        showToast('Código no encontrado en inventario', 'error');
+                    }
+                    // No cerramos el escáner para permitir reintentar rápidamente si se desea
+                }
+            }
+        }
+
+        function simulateScan() {
+            if (scanContext === 'inventory') {
+                const input = $('product-code-input');
+                if (input) {
+                    input.value = "SIM-" + Math.floor(Math.random() * 100000);
+                    stopScanner();
+                }
+            } else {
+                // Simular escaneo POS con el primer producto disponible
+                const products = JSON.parse(localStorage.getItem(DB.PRODUCTS));
+                const product = products.find(p => p.status === 'disponible');
+                if (product) {
+                    addToCart(product.id);
+                    stopScanner();
+                } else {
+                    showToast("No hay productos disponibles", "error");
+                }
+            }
+        }
+
+        // --- MODULE: POS & CART ---
+        function loadPOS() {
+            const products = JSON.parse(localStorage.getItem(DB.PRODUCTS)).filter(p => p.status === 'disponible');
+            const grid = $('pos-grid');
+            grid.innerHTML = '';
+            products.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-900 transition cursor-pointer flex flex-col justify-between h-32 group';
+                card.onclick = () => addToCart(p.id);
+                card.innerHTML = `
+                    <div>
+                        <div class="font-bold text-gray-800 truncate text-sm" title="${p.name}">${p.name}</div>
+                        <div class="text-xs text-gray-500 font-mono mt-1">${p.code}</div>
+                    </div>
+                    <div class="flex justify-between items-end mt-2">
+                        <span class="text-gray-900 font-bold">${formatMoney(p.price)}</span>
+                        <div class="w-8 h-8 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center group-hover:bg-gray-900 group-hover:text-white transition">
+                            <i class="fa-solid fa-plus text-xs"></i>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            renderCart();
+        }
+
+        function addToCart(productId) {
+            if (cart.find(i => i.id === productId)) return showToast('Ya está en el carrito', 'error');
+            const products = JSON.parse(localStorage.getItem(DB.PRODUCTS));
+            const p = products.find(x => x.id === productId);
+            cart.push({ ...p, salePrice: p.price });
+            renderCart();
+        }
+
+        function renderCart() {
+            const container = $('cart-container');
+            container.innerHTML = '';
+            let total = 0;
+            if (cart.length === 0) {
+                container.innerHTML = `<div class="text-center text-gray-400 mt-10 flex flex-col items-center"><i class="fa-solid fa-basket-shopping text-4xl mb-2 opacity-20"></i><p class="text-sm">Carrito vacío</p></div>`;
+            } else {
+                cart.forEach((item, index) => {
+                    total += parseFloat(item.salePrice);
+                    const div = document.createElement('div');
+                    div.className = 'bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col gap-2';
+                    div.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div class="text-sm font-bold text-gray-800 truncate w-2/3">${item.name}</div>
+                            <button onclick="removeFromCart(${index})" class="text-gray-400 hover:text-red-500"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-gray-500 font-mono bg-gray-50 px-1 rounded">${item.code}</span>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-400 text-xs">$</span>
+                                <input type="number" value="${Math.round(item.salePrice)}" 
+                                    onchange="updatePrice(${index}, this.value)"
+                                    class="w-20 text-right font-bold text-gray-900 bg-gray-50 border border-gray-200 rounded px-1 py-0.5 focus:ring-1 focus:ring-gray-500 outline-none text-sm">
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+            }
+            $('cart-subtotal').innerText = formatMoney(total);
+            $('cart-total').innerText = formatMoney(total);
+        }
+
+        function updatePrice(index, value) {
+            cart[index].salePrice = parseFloat(value);
+            renderCart();
+        }
+
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            renderCart();
+        }
+        
+        function clearCart() {
+            cart = [];
+            renderCart();
+        }
+
+        function processSale() {
+            if (cart.length === 0) return showToast('Carrito vacío', 'error');
+            const total = cart.reduce((a, b) => a + b.salePrice, 0);
+            const cost = cart.reduce((a, b) => a + b.cost, 0);
+            const method = $('payment-method').value;
+
+            const sale = {
+                id: generateId(), date: new Date().toISOString(), userId: currentUser.id,
+                items: cart, total: total, cost: cost, method: method
+            };
+
+            const sales = JSON.parse(localStorage.getItem(DB.SALES));
+            sales.push(sale);
+            localStorage.setItem(DB.SALES, JSON.stringify(sales));
+
+            const products = JSON.parse(localStorage.getItem(DB.PRODUCTS));
+            cart.forEach(cartItem => {
+                const idx = products.findIndex(p => p.id === cartItem.id);
+                if (idx !== -1) products[idx].status = 'vendido';
+            });
+            localStorage.setItem(DB.PRODUCTS, JSON.stringify(products));
+
+            const trans = JSON.parse(localStorage.getItem(DB.TRANSACTIONS));
+            trans.push({
+                id: generateId(), date: new Date().toISOString(), type: 'income',
+                category: 'Venta POS', amount: total, desc: `Venta #${sale.id}`, userId: currentUser.id
+            });
+            localStorage.setItem(DB.TRANSACTIONS, JSON.stringify(trans));
+
+            showToast('¡Venta realizada con éxito!');
+            cart = [];
+            renderCart();
+            loadPOS();
+        }
+
+        // --- MODULE: INVENTORY ---
+        function loadInventory(filter = '') {
+            const products = JSON.parse(localStorage.getItem(DB.PRODUCTS) || '[]');
+            const tbody = $('inv-table-body');
+            tbody.innerHTML = '';
+            const filtered = products.filter(p => p.name.toLowerCase().includes(filter.toLowerCase()) || p.code.includes(filter));
+            
+            const actionDiv = $('inv-actions');
+            if (PERMISSIONS[currentUser.role].includes('inventory')) {
+                actionDiv.innerHTML = `<button onclick="toggleModal('product-modal')" class="bg-gray-900 hover:bg-black text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition"><i class="fa-solid fa-plus mr-1"></i> Nuevo</button>`;
+            } else {
+                actionDiv.innerHTML = '';
+            }
+
+            filtered.forEach(p => {
+                const statusClass = p.status === 'disponible' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 border-b border-gray-100 last:border-0">
+                        <td class="px-6 py-4 font-mono text-xs text-gray-500">${p.code}</td>
+                        <td class="px-6 py-4 font-medium text-gray-900">${p.name}</td>
+                        <td class="px-6 py-4">${formatMoney(p.cost)}</td>
+                        <td class="px-6 py-4 font-bold text-gray-900">${formatMoney(p.price)}</td>
+                        <td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs font-bold ${statusClass}">${p.status.toUpperCase()}</span></td>
+                        <td class="px-6 py-4 text-gray-500">${p.location}</td>
+                        <td class="px-6 py-4 text-right"><button class="text-gray-400 hover:text-gray-900"><i class="fa-solid fa-pen-to-square"></i></button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        $('inv-search').addEventListener('input', (e) => loadInventory(e.target.value));
+
+        // --- MODULE: FINANCE ---
+        function loadFinance() {
+            const trans = JSON.parse(localStorage.getItem(DB.TRANSACTIONS) || '[]');
+            const income = trans.filter(t => t.type === 'income').reduce((a, b) => a + b.amount, 0);
+            const expense = trans.filter(t => t.type === 'expense').reduce((a, b) => a + b.amount, 0);
+
+            $('fin-income').innerText = formatMoney(income);
+            $('fin-expense').innerText = formatMoney(expense);
+            $('fin-balance').innerText = formatMoney(income - expense);
+
+            const tbody = $('fin-table-body');
+            tbody.innerHTML = '';
+            trans.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(t => {
+                const isInc = t.type === 'income';
+                const icon = isInc ? '<i class="fa-solid fa-arrow-up text-green-500"></i>' : '<i class="fa-solid fa-arrow-down text-red-500"></i>';
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 border-b border-gray-50 last:border-0">
+                        <td class="px-6 py-3 text-xs text-gray-500">${new Date(t.date).toLocaleDateString()}</td>
+                        <td class="px-6 py-3">${icon} <span class="ml-1 font-bold ${isInc ? 'text-green-700' : 'text-red-700'}">${isInc ? 'Ingreso' : 'Egreso'}</span></td>
+                        <td class="px-6 py-3 text-gray-700">${t.category}</td>
+                        <td class="px-6 py-3 text-gray-600 text-sm">${t.desc}</td>
+                        <td class="px-6 py-3 text-right font-bold ${isInc ? 'text-green-600' : 'text-red-600'}">${formatMoney(t.amount)}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        $('trans-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const f = e.target;
+            const newT = {
+                id: generateId(), date: new Date().toISOString(), type: f.type.value,
+                category: f.category.value, amount: parseFloat(f.amount.value), desc: f.desc.value, userId: currentUser.id
+            };
+            const list = JSON.parse(localStorage.getItem(DB.TRANSACTIONS));
+            list.push(newT);
+            localStorage.setItem(DB.TRANSACTIONS, JSON.stringify(list));
+            showToast('Movimiento registrado');
+            toggleModal('trans-modal', false);
+            f.reset();
+            loadFinance();
+            loadDashboard();
         });
 
-        const data = await res.json();
-        if(!res.ok) throw new Error(data.message);
+        // --- DASHBOARD & GENERAL ---
+        function loadDashboard() {
+            const products = JSON.parse(localStorage.getItem(DB.PRODUCTS) || '[]');
+            const sales = JSON.parse(localStorage.getItem(DB.SALES) || '[]');
+            const trans = JSON.parse(localStorage.getItem(DB.TRANSACTIONS) || '[]');
 
-        alert("Registro exitoso");
-        showLogin();
+            const stockCount = products.filter(p => p.status === 'disponible').length;
+            const totalSales = sales.reduce((a, b) => a + b.total, 0);
+            const profit = totalSales - sales.reduce((a, b) => a + b.cost, 0);
+            
+            const settings = JSON.parse(localStorage.getItem(DB.SETTINGS));
+            const income = trans.filter(t => t.type === 'income').reduce((a,b)=>a+b.amount,0);
+            const expense = trans.filter(t => t.type === 'expense').reduce((a,b)=>a+b.amount,0);
+            const capital = parseFloat(settings.initialCapital) + income + totalSales - expense;
 
-    }catch(err){
-        document.getElementById("error").innerText = err.message;
-    }
-}
-</script>
+            $('dash-capital').innerText = formatMoney(capital);
+            $('dash-sales').innerText = formatMoney(totalSales);
+            $('dash-profit').innerText = formatMoney(profit);
+            $('dash-stock').innerText = stockCount;
 
+            const tbody = $('dash-table-body');
+            tbody.innerHTML = '';
+            trans.slice(0, 5).forEach(t => {
+                const isInc = t.type === 'income';
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 border-b border-gray-50 last:border-0">
+                        <td class="px-6 py-3">${new Date(t.date).toLocaleDateString()}</td>
+                        <td class="px-6 py-3"><span class="px-2 py-1 rounded text-xs font-bold ${isInc ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${isInc ? 'INGRESO' : 'EGRESO'}</span></td>
+                        <td class="px-6 py-3 font-medium">${t.desc}</td>
+                        <td class="px-6 py-3 text-right font-bold ${isInc ? 'text-green-600' : 'text-red-600'}">${isInc ? '+' : '-'} ${formatMoney(t.amount)}</td>
+                        <td class="px-6 py-3 text-xs text-gray-400">ID: ${t.userId}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function toggleModal(id, show = true) {
+            const el = $(id);
+            if (show) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+        }
+
+        $('product-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const f = e.target;
+            const newP = {
+                id: generateId(), name: f.name.value, cost: parseFloat(f.cost.value),
+                price: parseFloat(f.price.value), code: f.code.value, location: f.location.value, status: 'disponible'
+            };
+            const list = JSON.parse(localStorage.getItem(DB.PRODUCTS));
+            list.push(newP);
+            localStorage.setItem(DB.PRODUCTS, JSON.stringify(list));
+            showToast('Producto guardado');
+            toggleModal('product-modal', false);
+            f.reset();
+            loadInventory();
+        });
+
+        $('pos-search').addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const cards = document.querySelectorAll('#pos-grid > div');
+            cards.forEach(card => card.style.display = card.innerText.toLowerCase().includes(term) ? 'flex' : 'none');
+        });
+
+        initDB();
+    </script>
 </body>
 </html>
